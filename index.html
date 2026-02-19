@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes"
+    />
+    <title>Аналитика по днищам</title>
+    <!-- Библиотеки -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Шрифты -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Наши стили -->
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div class="header-content">
+          <div>
+            <h1>📊 Аналитика производства — Сварка днищ</h1>
+            <p class="subtitle">
+              Система мониторинга эффективности и качества сварочных работ
+            </p>
+          </div>
+          <button id="help-btn" class="help-button">❓ Справка</button>
+        </div>
+        <div class="data-status" id="data-status">
+          <span class="status-indicator"></span>
+          <span class="status-text">Загрузка данных...</span>
+        </div>
+      </header>
+
+      <!-- Панель фильтров (заполняется динамически) -->
+      <section class="card" id="filters-section">
+        <h2>Фильтры</h2>
+        <div id="filters-container" class="filters-grid"></div>
+        <div class="button-group">
+          <button id="apply-filters" class="primary">🔍 Применить</button>
+          <button id="reset-filters">⟲ Сбросить</button>
+        </div>
+      </section>
+
+      <!-- Основные метрики (заполнятся из JS) -->
+      <section class="card" id="metrics-section">
+        <div class="section-header">
+          <h2>📊 Ключевые показатели эффективности (KPI)</h2>
+          <button id="refresh-metrics" class="icon-btn" title="Обновить">
+            ⟳
+          </button>
+        </div>
+        <div class="metrics-legend">
+          <div class="legend-item">
+            <span class="indicator good"></span>
+            <span>Выше нормы</span>
+          </div>
+          <div class="legend-item">
+            <span class="indicator warning"></span>
+            <span>В пределах нормы</span>
+          </div>
+          <div class="legend-item">
+            <span class="indicator bad"></span>
+            <span>Ниже нормы</span>
+          </div>
+        </div>
+        <div class="stats-cards" id="stats-cards"></div>
+      </section>
+
+      <!-- Эффективность по сварщикам -->
+      <section class="card" id="welders-section">
+        <div class="section-header">
+          <h2>👷 Рейтинг сварщиков</h2>
+          <span
+            class="info-icon"
+            title="Ранжирование по производительности и качеству"
+            >ⓘ</span
+          >
+        </div>
+        <div class="welders-ranking" id="welders-ranking"></div>
+      </section>
+
+      <!-- Анализ брака -->
+      <section class="card" id="defect-analysis-section">
+        <div class="section-header">
+          <h2>⚠️ Анализ брака</h2>
+          <span class="info-icon" title="Детализация по причинам и сварщикам"
+            >ⓘ</span
+          >
+        </div>
+        <div class="defect-summary" id="defect-summary"></div>
+      </section>
+
+      <!-- График эффективности -->
+      <section class="card">
+        <div class="section-header">
+          <h2>📈 Динамика производства</h2>
+          <span
+            class="info-icon"
+            title="Суммарная длина сварных швов по периодам"
+            >ⓘ</span
+          >
+        </div>
+        <div class="chart-controls">
+          <label
+            >Период:
+            <select id="efficiency-group">
+              <option value="day">День</option>
+              <option value="month" selected>Месяц</option>
+              <option value="quarter">Квартал</option>
+              <option value="year">Год</option>
+            </select>
+          </label>
+          <button id="update-efficiency" class="primary">Обновить</button>
+        </div>
+        <div class="chart-container">
+          <canvas id="efficiency-chart"></canvas>
+        </div>
+        <div class="chart-legend">
+          <p><strong>Формула:</strong> Σ (Длина сварных швов) за период</p>
+        </div>
+      </section>
+
+      <!-- График длины сварных швов по сварщикам (линейный) -->
+      <section class="card">
+        <div class="section-header">
+          <h2>📏 Производительность сварщиков</h2>
+          <span class="info-icon" title="Сравнение длины швов по периодам"
+            >ⓘ</span
+          >
+        </div>
+        <div class="chart-controls">
+          <label
+            >Период:
+            <select id="weld-period">
+              <option value="month">По месяцам</option>
+              <option value="quarter">По кварталам</option>
+            </select>
+          </label>
+          <button id="update-weld" class="primary">Обновить</button>
+        </div>
+        <div class="chart-container">
+          <canvas id="weld-chart"></canvas>
+        </div>
+      </section>
+
+      <!-- Круговая диаграмма брака -->
+      <section class="card">
+        <div class="section-header">
+          <h2>🥧 Распределение брака по сварщикам</h2>
+          <span class="info-icon" title="Настройка правила определения брака"
+            >ⓘ</span
+          >
+        </div>
+        <div class="defect-rule-config">
+          <div class="rule-description">
+            <strong>Правило брака:</strong> запись считается бракованной, если
+            <select id="defect-field">
+              <!-- заполнится динамически -->
+            </select>
+            <select id="defect-operator">
+              <option value="=">=</option>
+              <option value="!=">≠</option>
+              <option value=">">></option>
+              <option value="<"><</option>
+            </select>
+            <input type="text" id="defect-value" value="0" />
+          </div>
+          <button id="apply-defect-rule" class="primary">
+            Применить правило
+          </button>
+        </div>
+        <div class="chart-container" style="height: 300px">
+          <canvas id="defect-pie"></canvas>
+        </div>
+      </section>
+
+      <!-- Тренды и сравнения -->
+      <section class="card" id="trends-section">
+        <div class="section-header">
+          <h2>📊 Тренды и сравнения</h2>
+          <span class="info-icon" title="Сравнение с предыдущим периодом">ⓘ</span>
+        </div>
+        <div class="trends-container" id="trends-container"></div>
+      </section>
+
+      <!-- Таблица отфильтрованных данных -->
+      <section class="card">
+        <div class="section-header">
+          <h2>📋 Детальные данные</h2>
+          <button id="export-data" class="secondary">📥 Экспорт в CSV</button>
+        </div>
+        <p class="table-info">Показано записей: <span id="result-count">0</span></p>
+        <div class="table-wrapper">
+          <table id="result-table">
+            <thead id="table-header"></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Модальное окно для помощи -->
+    <div id="help-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>📖 Справка по приложению</h3>
+          <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <h4>Метрики и формулы</h4>
+          <ul>
+            <li><strong>Всего операций:</strong> количество операций сварки за период</li>
+            <li><strong>Сумма швов (м):</strong> Σ (Длина сварных швов) всех операций</li>
+            <li><strong>Средняя длина (м):</strong> Σ швов / количество записей</li>
+            <li><strong>Брак (%):</strong> (забракованные днища / всего операций) × 100</li>
+          </ul>
+          <h4>Данные о браке</h4>
+          <p>Система автоматически использует данные из листа "Брак" Google Таблицы для расчёта процента брака. Связь данных осуществляется по:</p>
+          <ul>
+            <li>Номер заказа</li>
+            <li>№ Днища</li>
+          </ul>
+          <p>Если данные о браке недоступны, используется настраиваемое правило.</p>
+          <h4>Фильтры</h4>
+          <p>Используйте текстовые фильтры для поиска по любым полям. Фильтрация нечувствительна к регистру и ищет частичные совпадения.</p>
+          <h4>Авто-ширина колонок</h4>
+          <p>Таблица данных автоматически подстраивает ширину колонок под содержимое для удобства просмотра.</p>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <!-- Наши скрипты (порядок важен) -->
+    <script src="utils/helpers.js"></script>
+    <script src="parser.js"></script>
+    <script src="utils/EfficiencyPlot.js"></script>
+    <script src="utils/WeldLengthPlot.js"></script>
+    <script src="utils/DefectPie.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
