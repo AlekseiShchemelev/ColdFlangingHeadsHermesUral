@@ -48,114 +48,6 @@
         </div>
       </section>
 
-      <!-- Настройка источников данных (свёрнута по умолчанию) -->
-      <section class="card" id="data-source-section">
-        <div class="section-header">
-          <h2>🔗 Настройка источников данных</h2>
-          <button
-            id="toggle-data-source"
-            class="icon-btn"
-            title="Свернуть/развернуть"
-          >
-            ▶
-          </button>
-        </div>
-        <div id="data-source-config" style="display: none">
-          <p class="config-description">
-            Выберите источник данных: локальные CSV файлы или опубликованная
-            Google Таблица.
-          </p>
-          <div class="data-source-tabs">
-            <button class="tab-btn active" data-source="local">
-              📁 Локальные файлы
-            </button>
-            <button class="tab-btn" data-source="google">
-              📊 Google Таблицы
-            </button>
-          </div>
-
-          <div id="local-source-config" class="source-config active">
-            <p>
-              Данные будут загружаться из локальных файлов
-              <code>data.csv</code> и <code>defect.csv</code>.
-            </p>
-            <p>
-              <small
-                >Файлы должны находиться в той же директории, что и
-                index.html</small
-              >
-            </p>
-          </div>
-
-          <div id="google-source-config" class="source-config">
-            <p>Данные будут загружаться из опубликованной Google Таблицы.</p>
-            <div class="config-row">
-              <label for="main-sheet-url">
-                <strong>Основной файл (сварка):</strong>
-                <small>Ссылка на опубликованный CSV</small>
-              </label>
-              <input
-                type="text"
-                id="main-sheet-url"
-                placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
-                style="width: 100%; margin-top: 0.5rem"
-              />
-            </div>
-            <div class="config-row" style="margin-top: 1rem">
-              <label for="defect-sheet-url">
-                <strong>Файл брака:</strong>
-                <small>Ссылка на опубликованный CSV</small>
-              </label>
-              <input
-                type="text"
-                id="defect-sheet-url"
-                placeholder="https://docs.google.com/spreadsheets/d/.../pub?gid=0&single=true&output=csv"
-                style="width: 100%; margin-top: 0.5rem"
-              />
-            </div>
-            <div class="config-row" style="margin-top: 1rem">
-              <button id="apply-google-config" class="primary">
-                💾 Применить настройки
-              </button>
-              <button id="reload-data" class="secondary">
-                🔄 Перезагрузить данные
-              </button>
-            </div>
-            <div
-              class="help-text"
-              style="
-                margin-top: 1rem;
-                padding: 1rem;
-                background: #f0f9ff;
-                border-radius: 8px;
-                border-left: 4px solid #3b82f6;
-              "
-            >
-              <strong>Как получить ссылку:</strong>
-              <ol style="margin: 0.5rem 0 0 1.5rem; padding: 0">
-                <li>Откройте Google Таблицу</li>
-                <li>Файл → Поделиться → Опубликовать в веб</li>
-                <li>Выберите "Лист" и формат "CSV"</li>
-                <li>Скопируйте полученную ссылку</li>
-              </ol>
-            </div>
-          </div>
-
-          <div
-            class="current-source"
-            style="
-              margin-top: 1rem;
-              padding: 0.75rem;
-              background: #f8fafc;
-              border-radius: 6px;
-            "
-          >
-            <strong>Текущий источник:</strong>
-            <span id="current-source-display">Локальные файлы</span>
-          </div>
-        </div>
-      </section>
-
       <!-- Основные метрики (заполнятся из JS) -->
       <section class="card" id="metrics-section">
         <div class="section-header">
@@ -179,6 +71,20 @@
           </div>
         </div>
         <div class="stats-cards" id="stats-cards"></div>
+      </section>
+
+      <!-- Тренды и сравнения -->
+      <section class="card" id="trends-section">
+        <div class="section-header">
+          <h2>📊 Тренды и сравнения</h2>
+          <span
+            class="info-icon graph-info"
+            data-graph="trends"
+            title="Сравнение с предыдущим периодом"
+            >ⓘ</span
+          >
+        </div>
+        <div class="trends-container" id="trends-container"></div>
       </section>
 
       <!-- Эффективность по сварщикам -->
@@ -348,20 +254,6 @@
         </div>
       </section>
 
-      <!-- Тренды и сравнения -->
-      <section class="card" id="trends-section">
-        <div class="section-header">
-          <h2>📊 Тренды и сравнения</h2>
-          <span
-            class="info-icon graph-info"
-            data-graph="trends"
-            title="Сравнение с предыдущим периодом"
-            >ⓘ</span
-          >
-        </div>
-        <div class="trends-container" id="trends-container"></div>
-      </section>
-
       <!-- Таблица отфильтрованных данных -->
       <section class="card">
         <div class="section-header">
@@ -381,6 +273,114 @@
           <button id="load-more" class="primary" style="display: none">
             Загрузить ещё
           </button>
+        </div>
+      </section>
+
+      <!-- Настройка источников данных (свёрнута по умолчанию) -->
+      <section class="card" id="data-source-section">
+        <div class="section-header">
+          <h2>🔗 Настройка источников данных</h2>
+          <button
+            id="toggle-data-source"
+            class="icon-btn"
+            title="Свернуть/развернуть"
+          >
+            ▶
+          </button>
+        </div>
+        <div id="data-source-config" style="display: none">
+          <p class="config-description">
+            Выберите источник данных: локальные CSV файлы или опубликованная
+            Google Таблица.
+          </p>
+          <div class="data-source-tabs">
+            <button class="tab-btn active" data-source="local">
+              📁 Локальные файлы
+            </button>
+            <button class="tab-btn" data-source="google">
+              📊 Google Таблицы
+            </button>
+          </div>
+
+          <div id="local-source-config" class="source-config active">
+            <p>
+              Данные будут загружаться из локальных файлов
+              <code>data.csv</code> и <code>defect.csv</code>.
+            </p>
+            <p>
+              <small
+                >Файлы должны находиться в той же директории, что и
+                index.html</small
+              >
+            </p>
+          </div>
+
+          <div id="google-source-config" class="source-config">
+            <p>Данные будут загружаться из опубликованной Google Таблицы.</p>
+            <div class="config-row">
+              <label for="main-sheet-url">
+                <strong>Основной файл (сварка):</strong>
+                <small>Ссылка на опубликованный CSV</small>
+              </label>
+              <input
+                type="text"
+                id="main-sheet-url"
+                placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv"
+                style="width: 100%; margin-top: 0.5rem"
+              />
+            </div>
+            <div class="config-row" style="margin-top: 1rem">
+              <label for="defect-sheet-url">
+                <strong>Файл брака:</strong>
+                <small>Ссылка на опубликованный CSV</small>
+              </label>
+              <input
+                type="text"
+                id="defect-sheet-url"
+                placeholder="https://docs.google.com/spreadsheets/d/.../pub?gid=0&single=true&output=csv"
+                style="width: 100%; margin-top: 0.5rem"
+              />
+            </div>
+            <div class="config-row" style="margin-top: 1rem">
+              <button id="apply-google-config" class="primary">
+                💾 Применить настройки
+              </button>
+              <button id="reload-data" class="secondary">
+                🔄 Перезагрузить данные
+              </button>
+            </div>
+            <div
+              class="help-text"
+              style="
+                margin-top: 1rem;
+                padding: 1rem;
+                background: #f0f9ff;
+                border-radius: 8px;
+                border-left: 4px solid #3b82f6;
+              "
+            >
+              <strong>Как получить ссылку:</strong>
+              <ol style="margin: 0.5rem 0 0 1.5rem; padding: 0">
+                <li>Откройте Google Таблицу</li>
+                <li>Файл → Поделиться → Опубликовать в веб</li>
+                <li>Выберите "Лист" и формат "CSV"</li>
+                <li>Скопируйте полученную ссылку</li>
+              </ol>
+            </div>
+          </div>
+
+          <div
+            class="current-source"
+            style="
+              margin-top: 1rem;
+              padding: 0.75rem;
+              background: #f8fafc;
+              border-radius: 6px;
+            "
+          >
+            <strong>Текущий источник:</strong>
+            <span id="current-source-display">Локальные файлы</span>
+          </div>
         </div>
       </section>
     </div>

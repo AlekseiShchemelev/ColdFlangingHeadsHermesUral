@@ -17,8 +17,8 @@ let tableDisplayLimit = 500; // сколько последних записей
 
 const KPI_TARGETS = {
   defectRate: 5,
-  avgLength: 10,
-  monthlyTarget: 1000,
+  avgLength: 30,
+  monthlyTarget: 900,
 };
 
 // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -125,6 +125,7 @@ function computeWeldersStats() {
     const length = window.safeParseFloat(row["Длина сварных швов"]);
     const cutType = row["Раскрой"] ? row["Раскрой"].toString().trim() : "";
     const wire = row["Проволока"] ? row["Проволока"].toString().trim() : "";
+    const dateStr = row["Дата"]; // для сбора смен
 
     // Коэффициент раскроя: берём первый символ, если он есть в словаре, иначе 1
     let cutCoeff = 1;
@@ -149,6 +150,7 @@ function computeWeldersStats() {
         totalLength: 0,
         weightedTotal: 0,
         bottoms: new Set(),
+        days: new Set(), // добавляем множество дат
       };
     }
     welders[welder].total++;
@@ -156,6 +158,9 @@ function computeWeldersStats() {
     welders[welder].weightedTotal += weightedLength;
     if (bottom) {
       welders[welder].bottoms.add(bottom);
+    }
+    if (dateStr) {
+      welders[welder].days.add(dateStr);
     }
   });
 
@@ -185,7 +190,13 @@ function computeWeldersStats() {
     info.defectRate = info.total
       ? ((defectCount / info.total) * 100).toFixed(1)
       : 0;
-    // Новый рейтинг: взвешенная длина минус штраф за брак (10 за каждое бракованное днище)
+
+    // Новая метрика: средняя длина за смену
+    const daysCount = info.days.size;
+    info.avgLengthPerShift =
+      daysCount > 0 ? (info.totalLength / daysCount).toFixed(2) : 0;
+
+    // Рейтинг: взвешенная длина минус штраф за брак (10 за каждое бракованное днище)
     const penaltyPerDefect = 10; // можно настроить
     info.score = info.weightedTotal - defectCount * penaltyPerDefect;
   });
@@ -310,6 +321,17 @@ function setupEventListeners() {
     if (e.target.id === "help-modal")
       document.getElementById("help-modal").classList.remove("active");
   });
+  // Обработчик для иконок справки по KPI (делегирование через родительский контейнер)
+  document.getElementById("stats-cards").addEventListener("click", (e) => {
+    const target = e.target.closest(".kpi-info");
+    if (target) {
+      e.preventDefault();
+      e.stopPropagation();
+      const kpiType = target.dataset.kpi;
+      showKPIInfo(kpiType);
+    }
+  });
+
   // Кнопка загрузки ещё записей в таблице
   document.getElementById("load-more").addEventListener("click", () => {
     tableDisplayLimit += 500;
@@ -341,6 +363,58 @@ function setupEventListeners() {
     }
   });
 
+  function showKPIInfo(kpiType) {
+    const modal = document.getElementById("graph-info-modal");
+    const titleEl = document.getElementById("graph-info-title");
+    const bodyEl = document.getElementById("graph-info-body");
+
+    let title = "";
+    let text = "";
+
+    switch (kpiType) {
+      case "total":
+        title = "Всего операций";
+        text = `
+          <p><strong>Что показывает:</strong> общее количество сварочных операций (записей) за выбранный период.</p>
+          <p><strong>Тренд:</strong> изменение количества операций между первой и второй половиной периода (относительное, в %). Рост — зелёный, падение — красный.</p>
+          <p><em>Пример:</em> если в первой половине было 100 операций, во второй — 110, тренд +10%.</p>
+        `;
+        break;
+      case "sum":
+        title = "Сумма швов (м)";
+        text = `
+          <p><strong>Что показывает:</strong> суммарную длину всех сварных швов в метрах за выбранный период.</p>
+          <p><strong>Тренд:</strong> изменение суммы между первой и второй половиной периода (относительное, в %). Рост — зелёный, падение — красный.</p>
+        `;
+        break;
+      case "avg":
+        title = "Средняя за смену (м)";
+        text = `
+          <p><strong>Что показывает:</strong> среднюю длину швов, выполненную за одну смену (уникальную дату). Рассчитывается как общая сумма швов, делённая на количество уникальных дат в периоде.</p>
+          <p><strong>Норма:</strong> ≥${KPI_TARGETS.avgLength} м.</p>
+          <p><strong>Тренд:</strong> изменение средней за смену между первой и второй половиной периода (относительное, в %). Рост — зелёный, падение — красный.</p>
+        `;
+        break;
+      case "defect":
+        title = "Брак (%)";
+        text = `
+          <p><strong>Что показывает:</strong> долю бракованных операций от общего числа.</p>
+          <p>Брак определяется по реальным данным из листа "Брак" (только операция "Предъявление продукции") или по настраиваемому правилу.</p>
+          <p><strong>Норма:</strong> ≤${KPI_TARGETS.defectRate}%.</p>
+          <p><strong>Тренд:</strong> изменение процента брака между первой и второй половиной периода в процентных пунктах (п.п.). Рост брака — красный, снижение — зелёный.</p>
+          <p><em>Пример:</em> брак вырос с 2% до 3% → тренд +1 п.п.</p>
+        `;
+        break;
+      default:
+        title = "Показатель";
+        text = "<p>Описание отсутствует.</p>";
+    }
+
+    titleEl.textContent = `ℹ️ ${title}`;
+    bodyEl.innerHTML = text;
+    modal.classList.add("active");
+  }
+
   // Также в самом конце файла добавляем новую функцию showGraphInfo
   function showGraphInfo(graph) {
     const modal = document.getElementById("graph-info-modal");
@@ -359,6 +433,7 @@ function setupEventListeners() {
             <li>Для каждого сварщика учитываются все операции за выбранный период.</li>
             <li>Рассчитывается взвешенная сумма длин швов с учётом коэффициентов сложности раскроя (А=2, Б=2, В=3, Г=4, Д=5, Е=4.5) и материала (нержавейка ×1.2, углеродистая ×1).</li>
             <li>Процент брака считается по уникальным забракованным днищам (из листа "Брак").</li>
+            <li><strong>Средняя длина за смену</strong> — общая длина швов, выполненная сварщиком, делённая на количество дней (смен), когда он работал.</li>
             <li>Рейтинг = <code>(взвешенная длина) - (количество бракованных днищ × 10)</code>.</li>
             <li>Чем выше рейтинг, тем эффективнее работает сварщик с учётом сложности работ.</li>
           </ul>
@@ -850,20 +925,26 @@ function updateStats() {
   const total = filteredData.length;
   let totalLength = 0,
     totalWire = 0;
+
+  // Общее количество уникальных дат (для средней за смену)
+  const uniqueDates = new Set();
+
   filteredData.forEach((row) => {
     totalLength += window.safeParseFloat(row["Длина сварных швов"]);
     totalWire += window.safeParseFloat(row["ИТОГО проволока"]);
+    const dateStr = row["Дата"];
+    if (dateStr) uniqueDates.add(dateStr);
   });
-  const avgLength = total ? (totalLength / total).toFixed(2) : 0;
 
+  const daysCount = uniqueDates.size;
+  const avgPerShift = daysCount > 0 ? (totalLength / daysCount).toFixed(2) : 0;
+
+  // Брак (общий)
   let defectCount, defectPct;
   if (window.hasDefectData()) {
     const mainDefects = getMainDefectData();
     defectCount = mainDefects.length;
     defectPct = total ? ((defectCount / total) * 100).toFixed(1) : 0;
-    console.log(
-      `updateStats: total=${total}, mainDefects=${defectCount}, defectPct=${defectPct}%`,
-    );
   } else {
     defectCount = filteredData.filter((row) =>
       evaluateDefect(row, defectRule),
@@ -871,9 +952,12 @@ function updateStats() {
     defectPct = total ? ((defectCount / total) * 100).toFixed(1) : 0;
   }
 
+  // --- РАСЧЁТ ТРЕНДОВ (по половинам) ---
   const midPoint = Math.floor(filteredData.length / 2);
   const firstHalf = filteredData.slice(0, midPoint);
   const secondHalf = filteredData.slice(midPoint);
+
+  // Сумма швов по половинам (уже было)
   const firstHalfLength = firstHalf.reduce(
     (sum, r) => sum + window.safeParseFloat(r["Длина сварных швов"]),
     0,
@@ -882,47 +966,146 @@ function updateStats() {
     (sum, r) => sum + window.safeParseFloat(r["Длина сварных швов"]),
     0,
   );
-  const trend =
+  const lengthTrend =
     firstHalfLength > 0
       ? (
           ((secondHalfLength - firstHalfLength) / firstHalfLength) *
           100
         ).toFixed(1)
       : 0;
-  const trendClass = trend > 0 ? "up" : trend < 0 ? "down" : "neutral";
-  const trendIcon = trend > 0 ? "↑" : trend < 0 ? "↓" : "→";
 
+  // Количество операций по половинам
+  const firstHalfCount = firstHalf.length;
+  const secondHalfCount = secondHalf.length;
+  const countTrend =
+    firstHalfCount > 0
+      ? (((secondHalfCount - firstHalfCount) / firstHalfCount) * 100).toFixed(1)
+      : 0;
+
+  // Уникальные даты и средняя за смену по половинам
+  const firstHalfDates = new Set();
+  firstHalf.forEach((r) => {
+    const d = r["Дата"];
+    if (d) firstHalfDates.add(d);
+  });
+  const secondHalfDates = new Set();
+  secondHalf.forEach((r) => {
+    const d = r["Дата"];
+    if (d) secondHalfDates.add(d);
+  });
+  const firstHalfAvg =
+    firstHalfDates.size > 0 ? firstHalfLength / firstHalfDates.size : 0;
+  const secondHalfAvg =
+    secondHalfDates.size > 0 ? secondHalfLength / secondHalfDates.size : 0;
+  const avgTrend =
+    firstHalfAvg > 0
+      ? (((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100).toFixed(1)
+      : 0;
+
+  // Процент брака по половинам
+  let firstHalfDefect = 0;
+  let secondHalfDefect = 0;
+  if (window.hasDefectData()) {
+    // Используем реальные данные брака
+    const mainDefects = getMainDefectData(); // все записи брака за период
+    // Превратим в Set номеров днищ для быстрого поиска
+    const defectiveBottoms = new Set();
+    mainDefects.forEach((d) => {
+      const b = window.getBottomNumber(d);
+      if (b) defectiveBottoms.add(b);
+    });
+    // Считаем брак в первой половине: количество уникальных днищ из firstHalf, попавших в defectiveBottoms
+    const firstHalfBottoms = new Set();
+    firstHalf.forEach((r) => {
+      const b = window.getBottomNumber(r);
+      if (b) firstHalfBottoms.add(b);
+    });
+    firstHalfDefect = [...firstHalfBottoms].filter((b) =>
+      defectiveBottoms.has(b),
+    ).length;
+    const secondHalfBottoms = new Set();
+    secondHalf.forEach((r) => {
+      const b = window.getBottomNumber(r);
+      if (b) secondHalfBottoms.add(b);
+    });
+    secondHalfDefect = [...secondHalfBottoms].filter((b) =>
+      defectiveBottoms.has(b),
+    ).length;
+  } else {
+    // Используем правило
+    firstHalfDefect = firstHalf.filter((r) =>
+      evaluateDefect(r, defectRule),
+    ).length;
+    secondHalfDefect = secondHalf.filter((r) =>
+      evaluateDefect(r, defectRule),
+    ).length;
+  }
+  const firstHalfDefectPct =
+    firstHalfCount > 0 ? (firstHalfDefect / firstHalfCount) * 100 : 0;
+  const secondHalfDefectPct =
+    secondHalfCount > 0 ? (secondHalfDefect / secondHalfCount) * 100 : 0;
+  const defectTrend = (secondHalfDefectPct - firstHalfDefectPct).toFixed(1); // в п.п.
+
+  // Определяем классы и значки для трендов
+  const getTrendInfo = (value, type = "percent") => {
+    if (value == 0) return { class: "neutral", icon: "→" };
+    const isPositive = value > 0;
+    if (type === "defect") {
+      // для брака: рост – плохо (красный вверх), падение – хорошо (зелёный вниз)
+      return {
+        class: isPositive ? "up bad" : "down good",
+        icon: isPositive ? "↑" : "↓",
+      };
+    } else {
+      // для остальных: рост – хорошо (зелёный вверх), падение – плохо (красный вниз)
+      return {
+        class: isPositive ? "up good" : "down bad",
+        icon: isPositive ? "↑" : "↓",
+      };
+    }
+  };
+
+  const lengthTrendInfo = getTrendInfo(parseFloat(lengthTrend), "length");
+  const countTrendInfo = getTrendInfo(parseFloat(countTrend), "count");
+  const avgTrendInfo = getTrendInfo(parseFloat(avgTrend), "avg");
+  const defectTrendInfo = getTrendInfo(parseFloat(defectTrend), "defect");
+
+  // Статусы для окраски карточек
   const defectStatus =
     parseFloat(defectPct) <= KPI_TARGETS.defectRate
       ? "good"
       : parseFloat(defectPct) <= KPI_TARGETS.defectRate * 2
         ? "warning"
         : "bad";
+
   const lengthStatus =
-    parseFloat(avgLength) >= KPI_TARGETS.avgLength ? "good" : "warning";
+    parseFloat(avgPerShift) >= KPI_TARGETS.avgLength ? "good" : "warning";
+
   const defectSource = window.hasDefectData()
     ? 'из листа "Брак" (только Предъявление продукции)'
     : "по правилу";
 
   document.getElementById("stats-cards").innerHTML = `
     <div class="stat-card ${lengthStatus}">
-      <span class="stat-label">Всего операций</span>
+      <span class="stat-label">Всего операций <span class="info-icon kpi-info" data-kpi="total" title="Подробнее">ⓘ</span></span>
       <div class="stat-value">${total}</div>
-      <div class="stat-trend neutral">Количество записей за период</div>
+      <div class="stat-trend ${countTrendInfo.class}">${countTrendInfo.icon} ${Math.abs(countTrend)}%</div>
     </div>
     <div class="stat-card ${lengthStatus}">
-      <span class="stat-label">Сумма швов (м)</span>
+      <span class="stat-label">Сумма швов (м) <span class="info-icon kpi-info" data-kpi="sum" title="Подробнее">ⓘ</span></span>
       <div class="stat-value">${formatNumber(totalLength)}</div>
-      <div class="stat-trend ${trendClass}">${trendIcon} ${Math.abs(trend)}% vs прошлый период</div>
+      <div class="stat-trend ${lengthTrendInfo.class}">${lengthTrendInfo.icon} ${Math.abs(lengthTrend)}%</div>
     </div>
     <div class="stat-card ${lengthStatus}">
-      <span class="stat-label">Средняя длина (м)</span>
-      <div class="stat-value">${avgLength}</div>
-      <div class="stat-trend neutral">Норма: ≥${KPI_TARGETS.avgLength}м</div>
+      <span class="stat-label">Средняя за смену (м) <span class="info-icon kpi-info" data-kpi="avg" title="Подробнее">ⓘ</span></span>
+      <div class="stat-value">${avgPerShift}</div>
+      <div class="stat-trend ${avgTrendInfo.class}">${avgTrendInfo.icon} ${Math.abs(avgTrend)}%</div>
+      <div class="stat-trend neutral">Норма: ≥${KPI_TARGETS.avgLength} м</div>
     </div>
     <div class="stat-card ${defectStatus}">
-      <span class="stat-label">Брак (%)</span>
+      <span class="stat-label">Брак (%) <span class="info-icon kpi-info" data-kpi="defect" title="Подробнее">ⓘ</span></span>
       <div class="stat-value">${defectPct}%</div>
+      <div class="stat-trend ${defectTrendInfo.class}">${defectTrendInfo.icon} ${Math.abs(defectTrend)} п.п.</div>
       <div class="stat-trend neutral">Норма: ≤${KPI_TARGETS.defectRate}% (${defectSource})</div>
     </div>
   `;
@@ -1048,7 +1231,8 @@ function updateWeldersRanking() {
       <div class="welder-metrics">
         <div class="welder-metric"><span class="welder-metric-label">Операций</span><span class="welder-metric-value">${data.total}</span></div>
         <div class="welder-metric"><span class="welder-metric-label">Сумма швов (м)</span><span class="welder-metric-value">${formatNumber(data.totalLength.toFixed(2))}</span></div>
-        <div class="welder-metric"><span class="welder-metric-label">Средняя длина (м)</span><span class="welder-metric-value">${data.avgLength}</span></div>
+        <!-- Заменяем старую метрику на новую -->
+        <div class="welder-metric"><span class="welder-metric-label">Средняя за смену (м)</span><span class="welder-metric-value">${data.avgLengthPerShift}</span></div>
         <div class="welder-metric"><span class="welder-metric-label">Брак (%)</span><span class="welder-metric-value" style="color: ${data.defectRate <= KPI_TARGETS.defectRate ? "#22c55e" : "#ef4444"}">${data.defectRate}%</span></div>
       </div>
     </div>
