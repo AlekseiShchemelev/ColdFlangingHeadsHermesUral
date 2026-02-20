@@ -9,7 +9,7 @@ let reworkPlot, otherDefectsPlot;
 let efficiencyPlot, weldLengthPlot, defectPie;
 let filteredDefectData = []; // отфильтрованные по дате записи брака (все операции)
 
-// Множество допустимых фамилий сварщиков (из основного листа)
+// Множество допустимых фамилий сварщиков (из основного листа) – пока не используется, но оставим
 let validWeldersSet = new Set();
 
 // Для пагинации таблицы
@@ -103,6 +103,96 @@ function getOtherDefectsData() {
   return { labels, counts };
 }
 
+// ========== НОВАЯ ФУНКЦИЯ ДЛЯ РАСЧЁТА СТАТИСТИКИ ПО СВАРЩИКАМ ==========
+function computeWeldersStats() {
+  const welders = {};
+
+  // Коэффициенты сложности раскроя (по первой букве)
+  const cutCoeffs = {
+    А: 2,
+    Б: 2,
+    В: 3,
+    Г: 4,
+    Д: 5,
+    Е: 4.5,
+  };
+  // Проволоки углеродистой стали (для определения материала)
+  const carbonWires = ["08Г2С", "10НМА", "08ГА"];
+
+  filteredData.forEach((row) => {
+    const welder = row["welder_normalized"] || "Неизвестно";
+    const bottom = window.getBottomNumber(row);
+    const length = window.safeParseFloat(row["Длина сварных швов"]);
+    const cutType = row["Раскрой"] ? row["Раскрой"].toString().trim() : "";
+    const wire = row["Проволока"] ? row["Проволока"].toString().trim() : "";
+
+    // Коэффициент раскроя: берём первый символ, если он есть в словаре, иначе 1
+    let cutCoeff = 1;
+    if (cutType) {
+      const firstChar = cutType.charAt(0).toUpperCase();
+      if (cutCoeffs.hasOwnProperty(firstChar)) {
+        cutCoeff = cutCoeffs[firstChar];
+      }
+    }
+
+    // Коэффициент материала: углеродистая = 1, нержавейка = 1.2
+    let materialCoeff = 1.2; // по умолчанию нержавейка
+    if (carbonWires.some((cw) => wire.includes(cw))) {
+      materialCoeff = 1.0;
+    }
+
+    const weightedLength = length * cutCoeff * materialCoeff;
+
+    if (!welders[welder]) {
+      welders[welder] = {
+        total: 0,
+        totalLength: 0,
+        weightedTotal: 0,
+        bottoms: new Set(),
+      };
+    }
+    welders[welder].total++;
+    welders[welder].totalLength += length;
+    welders[welder].weightedTotal += weightedLength;
+    if (bottom) {
+      welders[welder].bottoms.add(bottom);
+    }
+  });
+
+  // Собираем бракованные днища из листа брака (только "Предъявление продукции")
+  const defectiveBottoms = new Set();
+  if (window.hasDefectData()) {
+    const mainDefects = getMainDefectData();
+    mainDefects.forEach((defectRow) => {
+      const bottom = window.getBottomNumber(defectRow);
+      if (bottom) defectiveBottoms.add(bottom);
+    });
+  }
+
+  // Для каждого сварщика считаем брак и производные показатели
+  Object.keys(welders).forEach((welder) => {
+    const info = welders[welder];
+    let defectCount = 0;
+    if (info.bottoms) {
+      info.bottoms.forEach((bottom) => {
+        if (defectiveBottoms.has(bottom)) defectCount++;
+      });
+    }
+    info.defect = defectCount;
+    info.avgLength = info.total
+      ? (info.totalLength / info.total).toFixed(2)
+      : 0;
+    info.defectRate = info.total
+      ? ((defectCount / info.total) * 100).toFixed(1)
+      : 0;
+    // Новый рейтинг: взвешенная длина минус штраф за брак (10 за каждое бракованное днище)
+    const penaltyPerDefect = 10; // можно настроить
+    info.score = info.weightedTotal - defectCount * penaltyPerDefect;
+  });
+
+  return welders;
+}
+
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("Приложение инициализируется...");
@@ -129,7 +219,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     filteredData = [...allData];
     filteredDefectData = result.defectData ? [...result.defectData] : [];
 
-    // Заполняем множество допустимых сварщиков
+    // Заполняем множество допустимых сварщиков (оставим для совместимости)
     validWeldersSet.clear();
     allData.forEach((row) => {
       const welder = row["welder_normalized"];
@@ -238,6 +328,19 @@ function setupEventListeners() {
     });
   });
 
+  // Закрытие модального окна справки по графикам
+  document
+    .querySelector("#graph-info-modal .close-modal")
+    .addEventListener("click", () => {
+      document.getElementById("graph-info-modal").classList.remove("active");
+    });
+
+  document.getElementById("graph-info-modal").addEventListener("click", (e) => {
+    if (e.target.id === "graph-info-modal") {
+      document.getElementById("graph-info-modal").classList.remove("active");
+    }
+  });
+
   // Также в самом конце файла добавляем новую функцию showGraphInfo
   function showGraphInfo(graph) {
     const modal = document.getElementById("graph-info-modal");
@@ -254,10 +357,10 @@ function setupEventListeners() {
           <p><strong>Как считается рейтинг:</strong></p>
           <ul>
             <li>Для каждого сварщика учитываются все операции за выбранный период.</li>
-            <li>Рассчитывается средняя длина шва: <code>Σ длина швов / количество операций</code>.</li>
-            <li>Процент брака считается по уникальным забракованным днищам (если есть данные брака) или по правилу.</li>
-            <li>Рейтинг = <code>(средняя длина × 10) - % брака</code>.</li>
-            <li>Чем выше рейтинг, тем эффективнее работает сварщик.</li>
+            <li>Рассчитывается взвешенная сумма длин швов с учётом коэффициентов сложности раскроя (А=2, Б=2, В=3, Г=4, Д=5, Е=4.5) и материала (нержавейка ×1.2, углеродистая ×1).</li>
+            <li>Процент брака считается по уникальным забракованным днищам (из листа "Брак").</li>
+            <li>Рейтинг = <code>(взвешенная длина) - (количество бракованных днищ × 10)</code>.</li>
+            <li>Чем выше рейтинг, тем эффективнее работает сварщик с учётом сложности работ.</li>
           </ul>
           <p><strong>Данные:</strong> из основного листа (сварка) и листа "Брак" (при наличии).</p>
         `;
@@ -350,19 +453,6 @@ function setupEventListeners() {
     bodyEl.innerHTML = text;
     modal.classList.add("active");
   }
-
-  // Закрытие модального окна справки по графикам
-  document
-    .querySelector("#graph-info-modal .close-modal")
-    .addEventListener("click", () => {
-      document.getElementById("graph-info-modal").classList.remove("active");
-    });
-
-  document.getElementById("graph-info-modal").addEventListener("click", (e) => {
-    if (e.target.id === "graph-info-modal") {
-      document.getElementById("graph-info-modal").classList.remove("active");
-    }
-  });
   initDataSourceConfig();
 }
 
@@ -928,64 +1018,15 @@ function calculateColumnWidths(headers) {
   return percentages.map((pct) => (pct / totalPct) * 100);
 }
 
+// ========== ОБНОВЛЁННАЯ ФУНКЦИЯ РЕЙТИНГА СВАРЩИКОВ ==========
 function updateWeldersRanking() {
-  // Собираем информацию о сварщиках из основного листа
-  const welders = {};
-  filteredData.forEach((row) => {
-    const welder = row["welder_normalized"] || "Неизвестно";
-    const bottom = window.getBottomNumber(row);
-    if (!welders[welder]) {
-      welders[welder] = {
-        total: 0,
-        totalLength: 0,
-        bottoms: new Set(), // уникальные днища, которые варил этот сварщик
-      };
-    }
-    welders[welder].total++;
-    welders[welder].totalLength += window.safeParseFloat(
-      row["Длина сварных швов"],
-    );
-    if (bottom) {
-      welders[welder].bottoms.add(bottom);
-    }
-  });
-
+  const welders = computeWeldersStats();
   console.log("Welders from main (после фильтрации):", Object.keys(welders));
-
-  // Собираем все бракованные днища из листа брака (только "Предъявление продукции")
-  const defectiveBottoms = new Set();
-  if (window.hasDefectData()) {
-    const mainDefects = getMainDefectData();
-    mainDefects.forEach((defectRow) => {
-      const bottom = window.getBottomNumber(defectRow);
-      if (bottom) defectiveBottoms.add(bottom);
-    });
-    console.log("Уникальные бракованные днища:", defectiveBottoms.size);
-  }
-
-  // Для каждого сварщика считаем, сколько его уникальных днищ попали в брак
-  Object.keys(welders).forEach((welder) => {
-    const info = welders[welder];
-    let defectCount = 0;
-    if (info.bottoms) {
-      info.bottoms.forEach((bottom) => {
-        if (defectiveBottoms.has(bottom)) defectCount++;
-      });
-    }
-    info.defect = defectCount;
-    info.avgLength = info.total
-      ? (info.totalLength / info.total).toFixed(2)
-      : 0;
-    info.defectRate = info.total
-      ? ((defectCount / info.total) * 100).toFixed(1)
-      : 0;
-    info.score = parseFloat(info.avgLength) * 10 - parseFloat(info.defectRate);
-  });
 
   console.log("=== Детальный расчёт процента брака (по днищам) ===");
   Object.keys(welders).forEach((w) => {
     console.log(
-      `${w}: операции = ${welders[w].total}, брак = ${welders[w].defect}, % = ${welders[w].defectRate}`,
+      `${w}: операции = ${welders[w].total}, брак = ${welders[w].defect}, % = ${welders[w].defectRate}, взвешенная длина = ${welders[w].weightedTotal.toFixed(2)}`,
     );
   });
 
@@ -1016,42 +1057,26 @@ function updateWeldersRanking() {
     .join("");
 }
 
+// ========== ОБНОВЛЁННАЯ ФУНКЦИЯ АНАЛИЗА БРАКА ==========
 function updateDefectSummary() {
   const total = filteredData.length;
 
-  let defectCount, defectPct;
-  if (window.hasDefectData()) {
-    const mainDefects = getMainDefectData();
-    defectCount = mainDefects.length;
-    defectPct = total ? (defectCount / total) * 100 : 0;
-  } else {
-    defectCount = filteredData.filter((row) =>
-      evaluateDefect(row, defectRule),
-    ).length;
-    defectPct = total ? (defectCount / total) * 100 : 0;
-  }
+  // Используем общую функцию для получения статистики по сварщикам
+  const welders = computeWeldersStats();
 
-  const welderDefects = {};
-  if (window.hasDefectData()) {
-    const mainDefects = getMainDefectData();
-    mainDefects.forEach((defectRow) => {
-      const welder = defectRow["executor_normalized"] || "Неизвестно";
-      if (validWeldersSet.has(welder)) {
-        welderDefects[welder] = (welderDefects[welder] || 0) + 1;
-      }
-    });
-  } else {
-    filteredData.forEach((row) => {
-      const welder = row["welder_normalized"] || "Неизвестно";
-      if (evaluateDefect(row, defectRule)) {
-        welderDefects[welder] = (welderDefects[welder] || 0) + 1;
-      }
-    });
-  }
+  // Общее количество бракованных операций (уникальные днища)
+  const defectCount = Object.values(welders).reduce(
+    (sum, w) => sum + w.defect,
+    0,
+  );
+  const defectPct = total ? (defectCount / total) * 100 : 0;
 
-  const topDefectWelders = Object.entries(welderDefects)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
+  // Топ сварщиков по количеству бракованных операций (абсолютное число)
+  const topDefectWelders = Object.entries(welders)
+    .sort((a, b) => b[1].defect - a[1].defect)
+    .slice(0, 3)
+    .map(([welder, data]) => [welder, data.defect]);
+
   const statusClass = defectPct <= KPI_TARGETS.defectRate ? "low" : "high";
   const defectSource = window.hasDefectData()
     ? 'Лист "Брак" (только Предъявление продукции)'
@@ -1347,7 +1372,7 @@ function getReworkData() {
   // Для каждого сварщика считаем, сколько его уникальных днищ попали в reworkBottoms
   const labels = [];
   const reworkCounts = [];
-  const uniqueBottoms = []; // здесь можно оставить общее количество уникальных днищ сварщика или что-то другое
+  const uniqueBottoms = []; // здесь можно оставить общее количество уникальных днищ сварщика
 
   Object.keys(welderBottoms).forEach((welder) => {
     const bottoms = welderBottoms[welder];
