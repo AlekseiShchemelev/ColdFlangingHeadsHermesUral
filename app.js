@@ -227,21 +227,6 @@ function setupEventListeners() {
     if (tableDisplayLimit >= filteredData.length) {
       document.getElementById("load-more").style.display = "none";
     }
-    // Закрытие модального окна справки по графикам
-    document
-      .querySelector("#graph-info-modal .close-modal")
-      .addEventListener("click", () => {
-        document.getElementById("graph-info-modal").classList.remove("active");
-      });
-    document
-      .getElementById("graph-info-modal")
-      .addEventListener("click", (e) => {
-        if (e.target.id === "graph-info-modal") {
-          document
-            .getElementById("graph-info-modal")
-            .classList.remove("active");
-        }
-      });
   });
 
   // Обработчики для иконок справки по графикам
@@ -365,6 +350,19 @@ function setupEventListeners() {
     bodyEl.innerHTML = text;
     modal.classList.add("active");
   }
+
+  // Закрытие модального окна справки по графикам
+  document
+    .querySelector("#graph-info-modal .close-modal")
+    .addEventListener("click", () => {
+      document.getElementById("graph-info-modal").classList.remove("active");
+    });
+
+  document.getElementById("graph-info-modal").addEventListener("click", (e) => {
+    if (e.target.id === "graph-info-modal") {
+      document.getElementById("graph-info-modal").classList.remove("active");
+    }
+  });
   initDataSourceConfig();
 }
 
