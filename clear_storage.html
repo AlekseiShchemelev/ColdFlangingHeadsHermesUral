@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Очистка настроек</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .info {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      border-left: 4px solid #2196F3;
+    }
+    .warning {
+      background: #fff3cd;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      border-left: 4px solid #ffc107;
+    }
+    button {
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #1976D2;
+    }
+    button.danger {
+      background: #f44336;
+    }
+    button.danger:hover {
+      background: #d32f2f;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      display: none;
+    }
+    .result.success {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
+      color: #155724;
+    }
+    .result.error {
+      background: #f8d7da;
+      border-left: 4px solid #dc3545;
+      color: #721c24;
+    }
+    #stored-config {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 Очистка настроек приложения</h1>
+    
+    <div class="info">
+      <strong>Назначение:</strong> Этот инструмент предназначен для очистки сохранённых настроек Google Sheets из браузера.
+    </div>
+    
+    <div class="warning">
+      <strong>Внимание!</strong> Это удалит все сохранённые ссылки на Google Таблицы. После очистки вам нужно будет ввести их заново в приложении.
+    </div>
+    
+    <h2>Текущие настройки в localStorage:</h2>
+    <div id="stored-config">Загрузка...</div>
+    
+    <h2>Действия:</h2>
+    <button onclick="clearConfig()">🗑️ Очистить настройки Google Sheets</button>
+    <button class="danger" onclick="clearAll()">⚠️ Очистить ВСЁ</button>
+    <button onclick="location.href='index.html'">↩️ Вернуться в приложение</button>
+    
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    // Загрузка текущих настроек
+    function loadConfig() {
+      const configDiv = document.getElementById('stored-config');
+      
+      try {
+        const googleSheetsConfig = localStorage.getItem('googleSheetsConfig');
+        
+        if (googleSheetsConfig) {
+          const config = JSON.parse(googleSheetsConfig);
+          configDiv.innerHTML = '<strong>Google Sheets настройки:</strong>\n' + JSON.stringify(config, null, 2);
+        } else {
+          configDiv.innerHTML = '<em>Нет сохранённых настроек</em>';
+        }
+      } catch (error) {
+        configDiv.innerHTML = '<strong>Ошибка:</strong> ' + error.message;
+      }
+    }
+    
+    // Очистка только настроек Google Sheets
+    function clearConfig() {
+      try {
+        localStorage.removeItem('googleSheetsConfig');
+        showResult('Настройки Google Sheets успешно очищены!', 'success');
+        loadConfig();
+      } catch (error) {
+        showResult('Ошибка при очистке: ' + error.message, 'error');
+      }
+    }
+    
+    // Очистка всех данных localStorage
+    function clearAll() {
+      if (confirm('Вы уверены, что хотите очистить ВСЕ данные из localStorage?')) {
+        try {
+          localStorage.clear();
+          showResult('Все данные localStorage успешно очищены!', 'success');
+          loadConfig();
+        } catch (error) {
+          showResult('Ошибка при очистке: ' + error.message, 'error');
+        }
+      }
+    }
+    
+    // Показать результат
+    function showResult(message, type) {
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = message;
+      resultDiv.className = 'result ' + type;
+      resultDiv.style.display = 'block';
+      
+      setTimeout(() => {
+        resultDiv.style.display = 'none';
+      }, 5000);
+    }
+    
+    // Загружаем настройки при открытии страницы
+    loadConfig();
+  </script>
+</body>
+</html>

@@ -1,4 +1,6 @@
-class WeldLengthPlot {
+// OtherDefectsPlot.js – круговая диаграмма прочих дефектов
+
+class OtherDefectsPlot {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
     if (!this.canvas) {
@@ -9,7 +11,7 @@ class WeldLengthPlot {
     this.chart = null;
   }
 
-  updateMultiLine(labels, datasets, title) {
+  update(labels, counts) {
     if (!this.ctx) return;
 
     try {
@@ -17,15 +19,15 @@ class WeldLengthPlot {
         this.chart.destroy();
       }
 
-      if (!labels.length || !datasets.length) {
+      if (!labels.length) {
         this.chart = new Chart(this.ctx, {
-          type: "line",
+          type: "doughnut",
           data: {
             labels: ["Нет данных"],
             datasets: [{
-              data: [0],
-              borderColor: "#e5e7eb",
-              backgroundColor: "#e5e7eb"
+              data: [1],
+              backgroundColor: ["#e5e7eb"],
+              borderWidth: 0
             }]
           },
           options: {
@@ -35,13 +37,10 @@ class WeldLengthPlot {
               legend: { display: false },
               title: {
                 display: true,
-                text: title || "Длина швов (нет данных)",
+                text: "Прочие дефекты (нет данных)",
                 font: { size: 14 }
               },
               tooltip: { enabled: false }
-            },
-            scales: {
-              y: { beginAtZero: true }
             }
           }
         });
@@ -49,75 +48,52 @@ class WeldLengthPlot {
       }
 
       this.chart = new Chart(this.ctx, {
-        type: "line",
+        type: "pie",
         data: {
           labels: labels,
-          datasets: datasets
+          datasets: [{
+            data: counts,
+            backgroundColor: [
+              "#3b82f6", "#ef4444", "#eab308", "#22c55e", "#a855f7",
+              "#ec4899", "#14b8a6", "#f97316", "#6b7280", "#8b5cf6",
+              "#06b6d4", "#f43f5e", "#84cc16", "#6366f1", "#fbbf24"
+            ],
+            borderWidth: 2,
+            borderColor: "#ffffff"
+          }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: "top",
+              position: "right",
               labels: {
                 padding: 12,
                 usePointStyle: true,
                 font: { size: 11 },
-                boxWidth: 20
+                boxWidth: 16
               }
             },
             title: {
               display: true,
-              text: title || "Длина швов по сварщикам",
+              text: "Распределение прочих дефектов по типам операций",
               font: { size: 14, weight: "bold" }
             },
             tooltip: {
-              mode: "index",
-              intersect: false,
               callbacks: {
                 label: (ctx) => {
-                  return `${ctx.dataset.label}: ${formatNumber(ctx.raw)} м`;
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  const percent = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                  return `${ctx.label}: ${ctx.raw} (${percent}%)`;
                 }
               }
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: "Длина швов (м)"
-              },
-              ticks: {
-                callback: (value) => formatNumber(value)
-              }
-            },
-            x: {
-              ticks: {
-                maxRotation: 45,
-                minRotation: 0
-              }
-            }
-          },
-          interaction: {
-            mode: "nearest",
-            axis: "x",
-            intersect: false
-          },
-          elements: {
-            line: {
-              tension: 0.3
-            },
-            point: {
-              radius: 3,
-              hoverRadius: 5
             }
           }
         }
       });
     } catch (error) {
-      console.error("Ошибка при обновлении многолинейного графика:", error);
+      console.error("Ошибка при обновлении диаграммы прочих дефектов:", error);
     }
   }
 

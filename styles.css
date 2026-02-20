@@ -797,3 +797,133 @@ td.empty {
 .table-wrapper::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ===== Настройка источников данных ===== */
+.config-description {
+  color: #64748b;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.data-source-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tab-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.tab-btn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.source-config {
+  display: none;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.source-config.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.config-row {
+  margin-bottom: 1rem;
+}
+
+.config-row label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.config-row label small {
+  display: block;
+  color: #64748b;
+  font-weight: 400;
+  margin-top: 0.25rem;
+}
+
+.config-row input[type="text"] {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.config-row input[type="text"]:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.config-row input[type="text"]::placeholder {
+  color: #94a3b8;
+}
+
+.help-text {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.help-text strong {
+  color: #1e293b;
+}
+
+.help-text ol {
+  margin: 0.5rem 0 0 1.5rem;
+  padding: 0;
+}
+
+.help-text li {
+  margin-bottom: 0.25rem;
+}
+
+.current-source {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.current-source strong {
+  color: #1e293b;
+}
+
+.current-source span {
+  color: #3b82f6;
+  font-weight: 600;
+}
